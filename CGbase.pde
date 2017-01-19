@@ -1,95 +1,126 @@
-import com.leapmotion.leap.CircleGesture;
 import com.leapmotion.leap.Gesture.State;
 import com.leapmotion.leap.Gesture.Type;
-import com.leapmotion.leap.Hand;
-import com.leapmotion.leap.KeyTapGesture;
-import com.leapmotion.leap.ScreenTapGesture;
 import com.leapmotion.leap.SwipeGesture;
 import com.onformative.leap.LeapMotionP5;
 
 import gifAnimation.*;
+
 GifMaker gifMaker;
 LeapMotionP5 leap;
 
-String imgName="IMG_2180.JPG";
+String imgName = "img1.jpg";
 PImage img;
+int fineness = 20;
+int rangeThreshold = 5;
+ArrayList<ColorMap> colors = new ArrayList<ColorMap>();
 
-int fineness=50;
+float camAngle = 0;
+float camRadius = 1200;
+float camSpeed = 3.0;
 
-float cameraRad=86;
-float R = 800;
-float camY = 350;
-color[][] clr;
-float[][] h,s,b;
-float speed = 3.0;
+class ColorMap {
+  color clr;
+  float posTheta, posRadius, posHigh;
+  int size;
+  ColorMap(color c) {
+    posTheta = radians(map(hue(c), 0, 255, 0, 360));
+    posRadius = map(saturation(c), 0, 255, -width, width);
+    posHigh = map(brightness(c), 0, 255, 0, width);
+    size = 15;
+    clr = color(c);
+  }
+  
+  void draw(){
+    pushMatrix();
+    rotateY(this.posTheta);
+    fill(this.clr, 180);
+    translate(this.posHigh, this.posRadius, 0);
+    sphere(this.size);
+    popMatrix();
+  }
+  
+  float range(color c) {
+    return dist(hue(this.clr), saturation(this.clr), brightness(this.clr), hue(c), saturation(c), brightness(c));
+  }
+}
+
+void makeColorMap() {
+  for (int x=0; x<img.width/fineness; x++) {
+    for (int y=0; y<img.height/fineness; y++) {
+      color dot = img.get(x*fineness, y*fineness);
+      if (colors.size() <= 0) {
+        colors.add(new ColorMap(dot));
+      }
+      boolean flg=false;
+      for (ColorMap c : colors) {
+        if (c.range(dot) < rangeThreshold) {
+          c.size+=10;
+          flg = true;
+          break;
+        }
+      }
+      if (!flg)colors.add(new ColorMap(dot));
+    }
+  }
+}
+
+
 
 void setup() {
   size(600, 600, P3D);
   colorMode(HSB, 255);
-  img=loadImage(imgName);
-  int xNum = img.width/fineness;
-  int yNum = img.height/fineness;
-  clr = new color[xNum][yNum];
-  h = new float[xNum][yNum];
-  s = new float[xNum][yNum];
-  b = new float[xNum][yNum];
-  for ( int x=0; x<img.width/fineness; x++ ) {
-    for ( int y=0; y<img.height/fineness; y++ ) {
-      clr[x][y] = img.get(x*fineness, y*fineness);
-      h[x][y] = map(hue(clr[x][y]), 0, 255, 0, 360);
-      s[x][y] = map(saturation(clr[x][y]), 0, 255, -width/2, width/2);
-      b[x][y] = map(brightness(clr[x][y]), 0, 255, 0, width);
-    }
-  }
   noStroke();
+  img=loadImage(imgName);
+
+  makeColorMap();
+
   leap = new LeapMotionP5(this);
   leap.enableGesture(Type.TYPE_SWIPE);
-  /*
-  gifMaker = new GifMaker(this, "lifegamecolor.gif");
-  gifMaker.setDelay(10);
-  */
+  
+  gifMaker = new GifMaker(this, "demo.gif");
+  gifMaker.setRepeat(0);
+  gifMaker.setDelay(20);
 }
 
 void draw() {
-  camera(cos(radians(cameraRad))*R, 0, sin(radians(cameraRad))*R,
-         0, 0, 0,
-         0, 1, 0 );
   background(0);
-  strokeWeight(3);
-  stroke(#ff0000);
-  line(0,0,0,100,0,0);
-  stroke(#0000ff);
-  line(0,0,0,0,100,0);
-  stroke(#00ff00);
-  line(0,0,0,0,0,-100);
-  noStroke();
-  for ( int x=0; x<img.width/fineness; x++ ) {
-    for ( int y=0; y<img.height/fineness; y++ ) {
-      pushMatrix();
-      rotateY(radians(h[x][y]));
-      fill(clr[x][y]);
-      translate(b[x][y], s[x][y], 0);
-      sphere(10);
-      popMatrix();
-    }
+  camera(cos(radians(camAngle))*camRadius, 0, sin(radians(camAngle))*camRadius, 
+    0, 0, 0, 
+    0, 1, 0 );
+  camAngle+=camSpeed;
+  if (camSpeed > 3) camSpeed-=1;
+
+  for (ColorMap c : colors) {
+    c.draw();
   }
-  for (Hand hand : leap.getHandList()) {
-    PVector handPos = leap.getPosition(hand);
-    ellipse(handPos.x, handPos.y, 20, 20);
-  }
-  /*
-  gifMaker.addFrame();
-  if (frameCount >= 200) {
+  if(frameCount <= 50*3){
+    gifMaker.addFrame();
+  } else {
     gifMaker.finish();
     exit();
   }
-  */
-  println(speed);
-  cameraRad+=speed;
-  if(speed>3) speed-=0.5;
 }
+
 public void swipeGestureRecognized(SwipeGesture gesture) {
-  if (gesture.state() == State.STATE_STOP) {
-    speed+=6;
+  if (gesture.state() == State.STATE_STOP) camSpeed+=6;
+}
+
+void keyPressed() {
+  if (keyCode == UP) {
+    fineness+=10;
   }
+  if (keyCode == DOWN) {
+    fineness-=10;
+  }
+  if (keyCode == RIGHT) {
+    rangeThreshold-=10;
+  }
+  if (keyCode == LEFT) {
+    rangeThreshold+=10;
+  }
+  if (key == 's') {
+    camSpeed+=6;
+  }
+  colors.clear();
+  makeColorMap();
 }
