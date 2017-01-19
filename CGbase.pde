@@ -80,6 +80,7 @@ void setup() {
   gifMaker = new GifMaker(this, "demo.gif");
   gifMaker.setRepeat(0);
   gifMaker.setDelay(20);
+  blendMode(ADD);
 }
 
 void draw() {
